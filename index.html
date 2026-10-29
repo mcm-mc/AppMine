@@ -211,7 +211,6 @@ button .bi, .tabs .bi, .seg .bi, .chip .bi { align-items: center; text-align: ce
 .seg.main button { margin-left: 0; margin-top: -2px; min-width: 0; }
 .seg.main button:nth-child(-n+3) { margin-top: 0; }
 .seg.main button:nth-child(n+2) { margin-left: -2px; }
-.seg.main button:nth-child(4) { grid-column: 1 / -1; margin-left: 0; }
 .sechead { margin-top: 14px; }
 #splash { position: fixed; inset: 0; z-index: 99; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: var(--bg); transition: opacity .45s ease, visibility .45s; }
 #splash.gone { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -220,6 +219,13 @@ button .bi, .tabs .bi, .seg .bi, .chip .bi { align-items: center; text-align: ce
 #splash .bar2 i { display: block; height: 100%; width: 40%; background: var(--accent); animation: sl 1s ease-in-out infinite alternate; }
 @keyframes sl { from { transform: translateX(-10%); } to { transform: translateX(150%); } }
 @media (prefers-reduced-motion: reduce) { #splash .bar2 i { animation: none; width: 100%; } #splash { transition: none; } }
+/*edcat*/
+.seg.main button:nth-child(n+2) { margin-left: -2px; }
+.seg.main button:nth-child(2) { margin-left: 0; }
+.seg.main button:first-child { grid-column: 1 / -1; margin-top: 0; margin-left: 0; }
+.seg.main button:nth-child(-n+4):not(:first-child) { margin-top: -2px; }
+.cat:not(#ed-cat) { max-height: 224px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#ed-cat { max-height: 172px; overflow-y: auto; margin-bottom: 10px; border: 2px solid var(--line, #333); padding: 4px; }
 </style>
 
 <div id="splash" role="status" aria-label="Loading"><h1>Maximum</h1><div class="bar2"><i></i></div></div>
@@ -1164,7 +1170,7 @@ function playersTab() {
     editor = `<form class="editor" id="ed" autocomplete="off">
       <div class="ed-h"><strong>${slotLabel(S.sec, S.sel)}</strong><span class="lbl">${S.sec === 'inv' ? (S.sel < 9 ? 'แถบเร็ว' : 'ช่องเก็บของ') : sc.th}</span></div>
       <label class="fld"><span>${bi('Item (id)', 'ไอเทม')}</span><input id="ed-id" type="text" inputmode="url" autocapitalize="none" spellcheck="false" value="${esc(cur ? cur.name : '')}" placeholder="e.g. diamond or minecraft:diamond"></label>
-      ${S.sec === 'armor' ? armorPicker(cur) : '<div class="sugg" id="sugg"></div>'}
+      ${S.sec === 'armor' ? armorPicker(cur) : '<div class="sugg" id="sugg"></div>' + edCatalog()}
       <div class="grid2">
         <label class="fld"><span>${bi('Count', 'จำนวน')}</span><input id="ed-n" type="number" min="1" max="${S.sec === 'armor' ? 1 : 64}" value="${cur ? cur.count : 1}"></label>
         <label class="fld"><span>${bi('Damage / data value', 'ค่า damage / ข้อมูล')}</span><input id="ed-d" type="number" min="0" max="32767" value="${cur ? cur.damage : 0}"></label>
@@ -1179,11 +1185,27 @@ function playersTab() {
   <div class="chips">${S.players.map((q, i) => `<button class="chip" aria-pressed="${i === S.pi}" data-pi="${i}">${esc(label(q.key))}</button>`).join('')}</div>
   <p class="mono key">${esc(p.key)}</p>
   ${pos ? `<div class="grid3">${['X', 'Y', 'Z'].map((a, i) => `<label class="fld"><span>${bi('Position ' + a, 'ตำแหน่ง ' + a)}</span><input type="number" step="0.5" data-pos="${i}" value="${Math.round(pos[i] * 100) / 100}"></label>`).join('')}</div><p class="note">Dimension · มิติ: ${DIMS[dim] ?? '–'}</p>` : ''}
-  <div class="seg main">${Object.entries(SECS).map(([k, v]) => `<button data-sec="${k}" aria-pressed="${S.sec === k}">${bi(v.en, v.th)}</button>`).join('')}</div>
+  <div class="seg main">${['inv', 'ender', 'armor', 'off'].map(k => [k, SECS[k]]).map(([k, v]) => `<button data-sec="${k}" aria-pressed="${S.sec === k}">${bi(v.en, v.th)}</button>`).join('')}</div>
   ${gridsHtml}
   ${editor}
   <ul class="items">${rows.join('') || `<li class="empty">${bi('No items here. Tap an empty slot to add one.', 'ไม่มีไอเทมในส่วนนี้ กดช่องว่างเพื่อใส่ของ')}</li>`}</ul>
   <p class="note">${bi('Newly added items carry no special block data; some block items may need checking in game. If one looks wrong, use the Spawn items tab with commands instead.', 'ไอเทมที่ใส่ใหม่ไม่มีข้อมูลบล็อกพิเศษ บางอย่างอาจต้องตรวจในเกม ถ้าผิดให้ใช้แท็บเสกของแบบคำสั่งแทน')}</p>`;
+}
+
+/* item browser inside the slot editor: same list as the Spawn tab, but updates only its own box so typed fields are kept */
+function edCatHtml() {
+  const q = (S.edQ || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/^minecraft:/, '');
+  const curId = ($('#ed-id') || {}).value ? normId($('#ed-id').value) : '';
+  S.edOpen = S.edOpen || new Set(); S.edCap = S.edCap || {};
+  const html = Object.entries(CATALOG).map(([g, ids]) => {
+    const m = q ? ids.filter(i => i.includes(q)) : ids; if (!m.length) return '';
+    const open = q ? true : S.edOpen.has(g); const cap = S.edCap[g] || 120; const shown = open ? m.slice(0, cap) : [];
+    return `<div class="grp"><button type="button" class="gh" data-egrp="${esc(g)}" aria-expanded="${open}"><span>${esc(GRP_EN[g] || g)}${GRP_EN[g] ? `<small>${esc(g)}</small>` : ''}</span><span class="lbl">${m.length}</span></button>${open ? `<div class="gridi">${shown.map(i => `<button type="button" class="it ${curId === 'minecraft:' + i ? 'on' : ''}" data-epick="${i}" title="${esc(nice(i))}">${icon(i, 'ic')}<span>${esc(nice(i))}</span></button>`).join('')}</div>${m.length > shown.length ? `<button type="button" class="ghost sm" data-emore="${esc(g)}">${bi('Show more (' + (m.length - shown.length) + ')', 'ดูเพิ่ม')}</button>` : ''}` : ''}</div>`;
+  }).join('');
+  return html || `<p class="empty">${bi('No items found. Type an id above.', 'ไม่พบไอเทม ลองพิมพ์ id เองด้านบน')}</p>`;
+}
+function edCatalog() {
+  return `<label class="fld"><span>${bi('Search items', 'ค้นหาไอเทม')} <small>${ITEM_IDS.length} items</small></span><input id="ed-q" type="search" value="${esc(S.edQ || '')}" placeholder="e.g. diamond, golden, ender"></label><div class="cat" id="ed-cat">${edCatHtml()}</div>`;
 }
 function giveTab() {
   const q = S.filter.trim().toLowerCase().replace(/\s+/g, '_');
@@ -1276,6 +1298,9 @@ document.addEventListener('click', e => {
   if (b.dataset.add) { const id = 'minecraft:' + b.dataset.add; if (S.give.has(id)) S.give.delete(id); else S.give.set(id, maxStack(id) === 1 ? 1 : 16); render(); return; }
   if (b.dataset.q) { const id = b.dataset.q; S.give.set(id, Math.max(1, Math.min(2304, (S.give.get(id) || 1) + (+b.dataset.d) * (maxStack(id) === 1 ? 1 : 8)))); render(); return; }
   if (b.dataset.rm) { S.give.delete(b.dataset.rm); render(); return; }
+  if (b.dataset.egrp) { const g = b.dataset.egrp; S.edOpen = S.edOpen || new Set(); if (S.edOpen.has(g)) S.edOpen.delete(g); else S.edOpen.add(g); $('#ed-cat').innerHTML = edCatHtml(); return; }
+  if (b.dataset.emore) { S.edCap = S.edCap || {}; S.edCap[b.dataset.emore] = (S.edCap[b.dataset.emore] || 120) + 120; $('#ed-cat').innerHTML = edCatHtml(); return; }
+  if (b.dataset.epick) { $('#ed-id').value = 'minecraft:' + b.dataset.epick; const sg = $('#sugg'); if (sg) sg.innerHTML = ''; refreshEnchRows(); $('#ed-cat').innerHTML = edCatHtml(); return; }
   if (b.dataset.pick) { const inp = $('#ed-id'); inp.value = 'minecraft:' + b.dataset.pick; refreshEnchRows(); document.querySelectorAll('[data-pick]').forEach(x => x.classList.toggle('on', x === b)); return; }
   if (b.dataset.sug) { $('#ed-id').value = b.dataset.sug; $('#sugg').innerHTML = ''; refreshEnchRows(); return; }
   const act = b.dataset.act; if (!act) return;
@@ -1328,6 +1353,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'f-q') { S.filter = t.value; const pos = t.selectionStart; render(); const n = $('#f-q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }
   else if (t.id === 'ed-cn') { S.edName = t.value; }
+  else if (t.id === 'ed-q') { S.edQ = t.value; const el = $('#ed-cat'); if (el) el.innerHTML = edCatHtml(); }
   else if (t.id === 'ed-id') {
     const q = t.value.trim().toLowerCase().replace(/^minecraft:/, '').replace(/\s+/g, '_');
     const m = q ? ITEM_IDS.filter(i => i.includes(q) && (S.sec !== 'armor' || armorOk(S.sel, i))).slice(0, 8) : [];
@@ -1451,6 +1477,6 @@ window.WB = WB;
 render();
 
 </script>
-<script>(function(){var s=document.getElementById("splash");if(!s)return;if(/[?&]embed=1/.test(location.search)){s.remove();return}var t0=Date.now();function hide(){s.classList.add("gone");setTimeout(function(){s.remove()},600)}function go(){var w=Math.max(0,1400-(Date.now()-t0));setTimeout(hide,w)}if(document.readyState==="complete")go();else window.addEventListener("load",go);setTimeout(hide,5000)})()</script>
+<script>(function(){var s=document.getElementById("splash");if(!s)return;var t0=Date.now();function hide(){s.classList.add("gone");setTimeout(function(){s.remove()},600)}function go(){var w=Math.max(0,1400-(Date.now()-t0));setTimeout(hide,w)}if(document.readyState==="complete")go();else window.addEventListener("load",go);setTimeout(hide,5000)})()</script>
 
 </body></html>
