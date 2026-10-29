@@ -1451,6 +1451,6 @@ window.WB = WB;
 render();
 
 </script>
-<script>(function(){var s=document.getElementById("splash");if(!s)return;var t0=Date.now();function hide(){s.classList.add("gone");setTimeout(function(){s.remove()},600)}function go(){var w=Math.max(0,1400-(Date.now()-t0));setTimeout(hide,w)}if(document.readyState==="complete")go();else window.addEventListener("load",go);setTimeout(hide,5000)})()</script>
+<script>(function(){var s=document.getElementById("splash");if(!s)return;if(/[?&]embed=1/.test(location.search)){s.remove();return}var t0=Date.now();function hide(){s.classList.add("gone");setTimeout(function(){s.remove()},600)}function go(){var w=Math.max(0,1400-(Date.now()-t0));setTimeout(hide,w)}if(document.readyState==="complete")go();else window.addEventListener("load",go);setTimeout(hide,5000)})()</script>
 
 </body></html>
